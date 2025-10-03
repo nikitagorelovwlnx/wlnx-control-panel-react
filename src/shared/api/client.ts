@@ -275,61 +275,43 @@ export class ApiClient {
       .join(' ');
   }
 
-  async getStages(): Promise<ConversationStage[]> {
-    const response = await this.makeRequest<{ stages: ConversationStage[] }>('/api/prompts/stages');
-    return response.stages;
-  }
+  async updateStagePrompts(stageId: string, prompts: Prompt[]): Promise<void> {
+    try {
+      // Transform prompts back to server format
+      const stageData: any = {};
+      
+      prompts.forEach(prompt => {
+        if (prompt.description === 'Question Prompt') {
+          stageData.question_prompt = prompt.content || '';
+        } else if (prompt.description === 'Extraction Prompt') {
+          stageData.extraction_prompt = prompt.content || '';
+        }
+      });
 
-  async createStage(stage: Omit<ConversationStage, 'id'>): Promise<ConversationStage> {
-    const response = await this.makeRequest<{ stage: ConversationStage }>('/api/prompts/stages', {
-      method: 'POST',
-      body: JSON.stringify(stage),
-    });
-    return response.stage;
-  }
-
-  async updateStage(id: string, stage: Partial<ConversationStage>): Promise<ConversationStage> {
-    const response = await this.makeRequest<{ stage: ConversationStage }>(
-      `/api/prompts/stages/${id}`,
-      {
+      await this.makeRequest(`/api/prompts/${stageId}`, {
         method: 'PUT',
-        body: JSON.stringify(stage),
-      }
-    );
-    return response.stage;
+        body: JSON.stringify(stageData),
+      });
+    } catch (error) {
+      console.error('Failed to update stage prompts:', error);
+      throw error;
+    }
   }
 
-  async deleteStage(id: string): Promise<void> {
-    await this.makeRequest(`/api/prompts/stages/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getPrompts(): Promise<Prompt[]> {
-    const response = await this.makeRequest<{ prompts: Prompt[] }>('/api/prompts');
-    return response.prompts;
-  }
-
-  async createPrompt(prompt: Omit<Prompt, 'id'>): Promise<Prompt> {
-    const response = await this.makeRequest<{ prompt: Prompt }>('/api/prompts', {
-      method: 'POST',
-      body: JSON.stringify(prompt),
-    });
-    return response.prompt;
-  }
-
-  async updatePrompt(id: string, prompt: Partial<Prompt>): Promise<Prompt> {
-    const response = await this.makeRequest<{ prompt: Prompt }>(`/api/prompts/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(prompt),
-    });
-    return response.prompt;
-  }
-
-  async deletePrompt(id: string): Promise<void> {
-    await this.makeRequest(`/api/prompts/${id}`, {
-      method: 'DELETE',
-    });
+  async restoreStageDefaults(stageId: string): Promise<void> {
+    try {
+      // Send empty prompts to restore defaults
+      await this.makeRequest(`/api/prompts/${stageId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          question_prompt: '',
+          extraction_prompt: ''
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to restore stage defaults:', error);
+      throw error;
+    }
   }
 
   // Coaches API

@@ -103,3 +103,26 @@ export function useDeletePrompt() {
     },
   });
 }
+
+export function useUpdateStagePrompts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ stageId, prompts }: { stageId: string; prompts: Prompt[] }) =>
+      apiClient.updateStagePrompts(stageId, prompts),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROMPTS_CONFIG_KEY });
+    },
+  });
+}
+
+export function useRestoreStageDefaults() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (stageId: string) => apiClient.restoreStageDefaults(stageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROMPTS_CONFIG_KEY });
+    },
+  });
+}

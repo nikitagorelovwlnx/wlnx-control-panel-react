@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw } from 'lucide-react';
-import { usePromptsConfiguration } from '../api/use-prompts';
+import { Save, RotateCcw, Check, X as XIcon } from 'lucide-react';
+import { usePromptsConfiguration, useUpdateStagePrompts, useRestoreStageDefaults } from '../api/use-prompts';
 import { Button } from '@/ui/button';
 import { Textarea } from '@/ui/textarea';
 import { CoachConfigurationTab } from '@/features/coaches/components/coach-configuration-tab';
+import type { Prompt } from '@/shared/types/api';
 
 export function PromptsConfigurationNew() {
-  const { data: config, isLoading } = usePromptsConfiguration();
+  const { data: config, isLoading, refetch } = usePromptsConfiguration();
+  const updateStagePrompts = useUpdateStagePrompts();
+  const restoreDefaults = useRestoreStageDefaults();
+  
   const [activeStage, setActiveStage] = useState<string>('coach');
   const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState<string | null>(null);
 
   // Load saved active stage from localStorage
   useEffect(() => {
@@ -60,17 +65,38 @@ export function PromptsConfigurationNew() {
   };
 
   const handleSaveStage = async (stageId: string) => {
-    console.log('Saving stage:', stageId);
-    // TODO: Implement save functionality
-    alert('Save functionality will be implemented');
+    try {
+      const stagePrompts = getStagePrompts(stageId).map(prompt => ({
+        ...prompt,
+        content: editedPrompts[prompt.id] || prompt.content,
+      }));
+
+      await updateStagePrompts.mutateAsync({ stageId, prompts: stagePrompts });
+      alert(`${config?.stages.find(s => s.id === stageId)?.name} prompts saved successfully!`);
+    } catch (error) {
+      console.error('Failed to save stage:', error);
+      alert('Failed to save prompts');
+    }
   };
 
   const handleRestoreDefaults = async (stageId: string) => {
-    if (confirm('Restore default prompts for this stage?')) {
-      console.log('Restoring defaults for stage:', stageId);
-      // TODO: Implement restore functionality
-      alert('Restore functionality will be implemented');
+    setShowRestoreConfirm(stageId);
+  };
+
+  const confirmRestore = async (stageId: string) => {
+    try {
+      await restoreDefaults.mutateAsync(stageId);
+      setShowRestoreConfirm(null);
+      await refetch();
+      alert(`${config?.stages.find(s => s.id === stageId)?.name} prompts restored to defaults!`);
+    } catch (error) {
+      console.error('Failed to restore defaults:', error);
+      alert('Failed to restore defaults');
     }
+  };
+
+  const cancelRestore = () => {
+    setShowRestoreConfirm(null);
   };
 
   const getStagePrompts = (stageId: string) => {
@@ -123,21 +149,48 @@ export function PromptsConfigurationNew() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleRestoreDefaults(activeStage)}
-                  className="gap-2"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Restore Defaults
-                </Button>
-                <Button
-                  onClick={() => handleSaveStage(activeStage)}
-                  className="gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  Save Stage
-                </Button>
+                {showRestoreConfirm === activeStage ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => confirmRestore(activeStage)}
+                      disabled={restoreDefaults.isPending}
+                      className="gap-2"
+                    >
+                      <Check className="h-4 w-4" />
+                      Confirm
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={cancelRestore}
+                      className="gap-2"
+                    >
+                      <XIcon className="h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleRestoreDefaults(activeStage)}
+                      className="gap-2"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Restore Defaults
+                    </Button>
+                    <Button
+                      onClick={() => handleSaveStage(activeStage)}
+                      disabled={updateStagePrompts.isPending}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {updateStagePrompts.isPending ? 'Saving...' : 'Save Stage'}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
 
