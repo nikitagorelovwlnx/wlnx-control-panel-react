@@ -212,7 +212,67 @@ export class ApiClient {
 
   // Prompts API
   async getPromptsConfiguration(): Promise<PromptsConfiguration> {
-    return this.makeRequest<PromptsConfiguration>('/api/prompts/configuration');
+    try {
+      const response = await this.makeRequest<any>('/api/prompts');
+      
+      // Transform server data structure to our expected format
+      const stages: ConversationStage[] = [];
+      const prompts: Prompt[] = [];
+      
+      if (response && typeof response === 'object') {
+        let stageOrder = 1;
+        for (const [stageKey, stageData] of Object.entries(response)) {
+          if (typeof stageData === 'object' && stageData !== null) {
+            // Create stage
+            stages.push({
+              id: stageKey,
+              name: this.formatStageName(stageKey),
+              description: `Stage: ${this.formatStageName(stageKey)}`,
+              order: stageOrder++
+            });
+
+            // Create prompts for this stage
+            const stageDataObj = stageData as any;
+            if (stageDataObj.question_prompt) {
+              prompts.push({
+                id: `${stageKey}_question`,
+                stageId: stageKey,
+                content: stageDataObj.question_prompt,
+                order: 1,
+                isActive: true,
+                description: 'Question Prompt'
+              });
+            }
+            if (stageDataObj.extraction_prompt) {
+              prompts.push({
+                id: `${stageKey}_extraction`,
+                stageId: stageKey,
+                content: stageDataObj.extraction_prompt,
+                order: 2,
+                isActive: true,
+                description: 'Extraction Prompt'
+              });
+            }
+          }
+        }
+      }
+
+      return {
+        stages,
+        prompts,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Failed to fetch prompts configuration:', error);
+      throw error;
+    }
+  }
+
+  private formatStageName(key: string): string {
+    return key
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   async getStages(): Promise<ConversationStage[]> {
