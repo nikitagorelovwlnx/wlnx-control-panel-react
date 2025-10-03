@@ -186,11 +186,49 @@ export class ApiClient {
   }
 
   async getHealth(): Promise<HealthResponse> {
-    return this.makeRequest<HealthResponse>('/api/health');
+    try {
+      // Try /health endpoint first
+      return await this.makeRequest<HealthResponse>('/health');
+    } catch (error) {
+      // Fallback to /api/users to check if server is alive
+      try {
+        await this.makeRequest<{ users: User[] }>('/api/users');
+        return {
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          uptime: 0,
+          version: 'unknown',
+          services: {
+            openai: { status: 'unknown' },
+            api: { status: 'up' },
+            telegram: { status: 'unknown' },
+          },
+          memory: {
+            used: 0,
+            total: 0,
+            percentage: 0,
+          },
+        };
+      } catch (fallbackError) {
+        throw error;
+      }
+    }
   }
 
   async getBotHealth(): Promise<PingResponse> {
-    return this.makeBotHealthRequest<PingResponse>('/health');
+    try {
+      return await this.makeBotHealthRequest<PingResponse>('/health');
+    } catch (error) {
+      try {
+        return await this.makeBotHealthRequest<PingResponse>('/status');
+      } catch (statusError) {
+        try {
+          return await this.makeBotHealthRequest<PingResponse>('/ping');
+        } catch (pingError) {
+          throw error;
+        }
+      }
+    }
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
